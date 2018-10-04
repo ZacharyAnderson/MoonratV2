@@ -6,6 +6,7 @@ import os
 import logging
 import urllib
 import configparser
+import requests
 
 # Grab the Bot OAuth token from the environment.
 # BOT_TOKEN = os.environ["BOT_TOKEN"]
@@ -29,9 +30,11 @@ def lambda_handler(data, context):
     if 'local' in data:
         config = configparser.ConfigParser()
         config.read('config.ini')
-        BOT_TOKEN = config['SLACK_TOKEN']['SLACK_BOT_TOKEN']
+        BOT_TOKEN = config['SLACK_BOT']['SLACK_BOT_TOKEN']
+        COINMARKETCAP_TOKEN = config['SLACK_BOT']['COINMARKETCAP_API_TOKEN']
     else:
         BOT_TOKEN = os.environ['BOT_TOKEN']
+        COINMARKETCAP_TOKEN = os.environ['COINMARKETCAP_API_TOKEN']
 
     if "challenge" in data:
         return data["challenge"]
@@ -48,48 +51,83 @@ def lambda_handler(data, context):
     if "bot_id" in slack_event:
         logging.warn("Ignore bot event")
     else:
-        # Get the text of the message the user sent to the bot,
-        # and reverse it.
+        # Parse through the text to see if any specific commands are referenced
         text = slack_event["text"]
-        reversed_text = text[::-1]
+        formatted_output = parse_crypto_commands(text, COINMARKETCAP_TOKEN)
+
         
         # Get the ID of the channel where the message was posted.
         channel_id = slack_event["channel"]
         
         '''  
             We need to send back three pieces of information:
-                1. The reversed text (text)
+                1. The Data requested
                 2. The channel id of the private, direct chat (channel)
                 3. The OAuth token required to communicate with 
-                the API (token)
+                    the API (token)
             Then, create an associative array and URL-encode it, 
             since the Slack API doesn't not handle JSON (bummer). 
         '''
-
 
         data = urllib.parse.urlencode(
             (
                 ("token", BOT_TOKEN),
                 ("channel", channel_id),
-                ("text", reversed_text)
+                ("text", formatted_output)
             )
         )
         data = data.encode("ascii")
         
         # Construct the HTTP request that will be sent to the Slack API.
-        request = urllib.request.Request(
-            SLACK_URL, 
-            data=data, 
-            method="POST"
-        )
-        # Add a header mentioning that the text is URL-encoded.
-        request.add_header(
-            "Content-Type", 
-            "application/x-www-form-urlencoded"
-        )
-        
-        # Fire off the request!
-        urllib.request.urlopen(request).read()
+        # # Add a header mentioning that the text is URL-encoded. 
+        # # Fire off the request!
+        headers = {'Content-Type':'application/x-www-form-urlencoded'}
+        req = requests.post(url=SLACK_URL, data=data, headers=headers, verify=False)
 
     # Everything went fine.
     return "200 OK"
+
+def parse_crypto_commands(text, api_token):
+    '''
+        Parses the string for known commands
+    '''
+    string = text.split()
+    if '!price' == string[0]:
+        crypto_db=create_crypto_db(api_token)
+        try:
+            req = requests.get(url='http://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol='+crypto_db[string[1].lower()],headers={'X-CMC_PRO_API_KEY':api_token},verify=False)
+            print(req.json()['data'])
+            return(create_coin_output(req.json()['data'][crypto_db[string[1].lower()]]))
+        except IndexError:
+            return('No coin mentioned...') 
+    else:
+        print(string)
+
+def create_crypto_db(api_token):
+    '''
+        Create the database mapping's needed to make api requests to coinmarketcap.
+    '''
+    headers = {'X-CMC_PRO_API_KEY':api_token}
+
+    req = requests.get(url='http://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest?limit=5000', headers=headers, verify=False)
+    all_coins = req.json()
+    crypto_db = {}
+    for data in all_coins['data']:
+        all_coins[data['slug']] = data['symbol'].upper()
+        all_coins[data['symbol'].lower()] = data['symbol'].upper()
+    return all_coins
+
+def create_coin_output(coin):
+    '''
+    create_coin_output gets the coin information for the specified coin
+    and forms a string that will be sent into the slack api.
+    '''
+    coin_output1 = "Grabbing latest data for *" + coin['name'] + "*\n"
+    coin_output2 = "```{:20s}\t${:.2f}\n".format("Price USD",float(coin['quote']['USD']['price']))
+    coin_output3 = "{:20s}\t${:.2f}\n".format("Market Cap",float(coin['quote']['USD']['market_cap']))
+    coin_output4 = "{:20s}\t{:.2f}%\n".format("Change 1hr",float(coin['quote']['USD']['percent_change_1h']))
+    coin_output5 = "{:20s}\t{:.2f}%\n".format("Change 24hr",float(coin['quote']['USD']['percent_change_24h']))
+    coin_output6 = "{:20s}\t{:.2f}%\n```".format("Change 7d",float(coin['quote']['USD']['percent_change_7d']))
+    return (coin_output1+coin_output2+coin_output3+coin_output4+coin_output5+coin_output6)
+
+

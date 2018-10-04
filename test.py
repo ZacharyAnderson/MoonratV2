@@ -5,7 +5,7 @@ import os
 
 def main():
 
-    input = "test message" #you can get this from wherever, the command line, or read from a file or just leave as a constant
+    input = "!price tron" #you can get this from wherever, the command line, or read from a file or just leave as a constant
     data = { 'event': { 'text': input, 'channel': 'G9P7X8Q0H' }, 'local':True}
     lambda_handler(data,{})
 
