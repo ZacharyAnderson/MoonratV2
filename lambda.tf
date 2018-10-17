@@ -1,7 +1,8 @@
 variable "bot_token" {}
+variable "coinmarketcap_token" {}
 
-resource "aws_lambda_function" "dev" {
-  function_name = "handleMoonrateEvent"
+resource "aws_lambda_function" "example" {
+  function_name = "handleMoonratEvent"
 
   # The bucket name as created earlier with "aws s3api create-bucket"
   s3_bucket = "lambda-function-package-bucket"
@@ -10,14 +11,15 @@ resource "aws_lambda_function" "dev" {
   # "main" is the filename within the zip file (main.js) and "handler"
   # is the name of the property under which the handler function was
   # exported in that file.
-  handler = "lambda_function.lambda_handler"
+  handler = "moonratv2.lambda_handler"
   runtime = "python3.6"
 
   role = "${aws_iam_role.lambda_exec.arn}"
 
   environment {
       variables {
-          BOT_TOKEN="${var.bot_token}"
+          BOT_TOKEN="${var.bot_token}",
+          COINMARKETCAP_API_TOKEN="${var.coinmarketcap_token}"
       }
   }
 }
@@ -25,7 +27,7 @@ resource "aws_lambda_function" "dev" {
 # IAM role which dictates what other AWS services the Lambda function
 # may access.
 resource "aws_iam_role" "lambda_exec" {
-  name = "handleMoonrateDirectEvent_role"
+  name = "handleMoonratDirectEvent_role"
 
   assume_role_policy = <<EOF
 {
@@ -42,4 +44,28 @@ resource "aws_iam_role" "lambda_exec" {
   ]
 }
 EOF
+}
+
+resource "aws_api_gateway_resource" "proxy" {
+  rest_api_id = "${aws_api_gateway_rest_api.example.id}"
+  parent_id   = "${aws_api_gateway_rest_api.example.root_resource_id}"
+  path_part   = "{proxy+}"
+}
+
+resource "aws_api_gateway_method" "proxy" {
+  rest_api_id   = "${aws_api_gateway_rest_api.example.id}"
+  resource_id   = "${aws_api_gateway_resource.proxy.id}"
+  http_method   = "ANY"
+  authorization = "NONE"
+}
+
+resource "aws_lambda_permission" "apigw" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = "${aws_lambda_function.example.arn}"
+  principal     = "apigateway.amazonaws.com"
+
+  # The /*/* portion grants access from any method on any resource
+  # within the API Gateway "REST API".
+  source_arn = "${aws_api_gateway_deployment.example.execution_arn}/*/*"
 }
