@@ -12,6 +12,6 @@ build_package:
 
 build: build_package
 	aws s3 cp ~/moonratV2/dist/PythonPackage.zip s3://lambda-function-package-bucket/v1.0.0/PythonPackage.zip
-	dir -f -r dist
+	rm -f -r dist
 clean:
 	rm -f *.zip

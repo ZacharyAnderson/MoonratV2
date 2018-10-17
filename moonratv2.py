@@ -68,21 +68,21 @@ def lambda_handler(data, context):
             Then, create an associative array and URL-encode it, 
             since the Slack API doesn't not handle JSON (bummer). 
         '''
-
-        data = urllib.parse.urlencode(
-            (
-                ("token", BOT_TOKEN),
-                ("channel", channel_id),
-                ("text", formatted_output)
+        if formatted_output != "None":
+            data = urllib.parse.urlencode(
+                (
+                    ("token", BOT_TOKEN),
+                    ("channel", channel_id),
+                    ("text", formatted_output)
+                )
             )
-        )
-        data = data.encode("ascii")
-        
-        # Construct the HTTP request that will be sent to the Slack API.
-        # # Add a header mentioning that the text is URL-encoded. 
-        # # Fire off the request!
-        headers = {'Content-Type':'application/x-www-form-urlencoded'}
-        req = requests.post(url=SLACK_URL, data=data, headers=headers, verify=False)
+            data = data.encode("ascii")
+            
+            # Construct the HTTP request that will be sent to the Slack API.
+            # # Add a header mentioning that the text is URL-encoded. 
+            # # Fire off the request!
+            headers = {'Content-Type':'application/x-www-form-urlencoded'}
+            req = requests.post(url=SLACK_URL, data=data, headers=headers, verify=False)
 
     # Everything went fine.
     return "200 OK"
@@ -96,12 +96,11 @@ def parse_crypto_commands(text, api_token):
         crypto_db=create_crypto_db(api_token)
         try:
             req = requests.get(url='http://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol='+crypto_db[string[1].lower()],headers={'X-CMC_PRO_API_KEY':api_token},verify=False)
-            print(req.json()['data'])
             return(create_coin_output(req.json()['data'][crypto_db[string[1].lower()]]))
         except IndexError:
             return('No coin mentioned...') 
     else:
-        print(string)
+        return("None")
 
 def create_crypto_db(api_token):
     '''
