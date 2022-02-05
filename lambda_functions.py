@@ -3,6 +3,7 @@ import requests
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 
+AV_KEY = 'LF81812IX59K1B17'
 PUBLIC_KEY = '<your public key here>' # found on Discord Application -> General Information page
 PING_PONG = {"type": 1}
 RESPONSE_TYPES =  { 
@@ -13,7 +14,7 @@ RESPONSE_TYPES =  {
                     "ACK_WITH_SOURCE": 5
                   }
 COINGECKO_BASEURL = 'https://api.coingecko.com/api/v3'
-
+ALPHAVANTAGE_BASEURL = ''
 def fetch_coingecko_ids_list():
     req = requests.get(url=COINGECKO_BASEURL+'/coins/list')
     return dict([(x['symbol'], x['id']) for x in req.json()])
@@ -60,10 +61,10 @@ def lambda_handler(event, context):
     except Exception as e:
         raise Exception(f"[UNAUTHORIZED] Invalid request signature: {e}")
 
-
     # check if message is a ping
     body = event.get('body-json')
     if ping_pong(body):
+        print(PING_PONG)
         return PING_PONG
     
     if crypto_price_check(body):
@@ -83,5 +84,3 @@ def lambda_handler(event, context):
                 "allowed_mentions": []
             }
     }
-
-lambda_handler('{}', '{}')
