@@ -1,5 +1,5 @@
 import json
-
+import requests
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 
@@ -12,6 +12,25 @@ RESPONSE_TYPES =  {
                     "MESSAGE_WITH_SOURCE": 4, 
                     "ACK_WITH_SOURCE": 5
                   }
+COINGECKO_BASEURL = 'https://api.coingecko.com/api/v3'
+
+def fetch_coingecko_ids_list():
+    req = requests.get(url=COINGECKO_BASEURL+'/coins/list')
+    return dict([(x['symbol'], x['id']) for x in req.json()])
+
+def fetch_crypto_price(symbol):
+    try:
+        idList = fetch_coingecko_ids_list()
+        val = idList[symbol.lower()]
+        if (val == None):
+            return
+        req = requests.get(url=COINGECKO_BASEURL+'/simple/price?ids='+val+'&vs_currencies=usd')
+        return req.json()[val]['usd']
+    except IndexError:
+        return('No coin mentioned...') 
+
+def fetch_stock_price():
+    return ''
 
 
 def verify_signature(event):
@@ -24,12 +43,17 @@ def verify_signature(event):
     verify_key.verify(message, bytes.fromhex(auth_sig)) # raises an error if unequal
 
 def ping_pong(body):
-    if body.get("type") == 1:
-        return True
-    return False
-    
+    return body.get("type") == 1
+
+def crypto_price_check(body):
+    return body.get("type") == 1 and body.get("type") == 'crypto'
+
+def stock_price_check(body):
+    return body.get("type") == 1 and body.get("type") == 'stock'
+
 def lambda_handler(event, context):
-    print(f"event {event}") # debug print
+    print(fetch_crypto_price("BTC"))
+
     # verify the signature
     try:
         verify_signature(event)
@@ -42,6 +66,12 @@ def lambda_handler(event, context):
     if ping_pong(body):
         return PING_PONG
     
+    if crypto_price_check(body):
+        return PING_PONG
+    
+    if stock_price_check(body):
+        return PING_PONG
+    
     
     # dummy return
     return {
@@ -52,4 +82,6 @@ def lambda_handler(event, context):
                 "embeds": [],
                 "allowed_mentions": []
             }
-        }
+    }
+
+lambda_handler('{}', '{}')
