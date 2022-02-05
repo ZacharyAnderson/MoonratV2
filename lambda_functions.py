@@ -1,5 +1,6 @@
 import json
 import requests
+
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 
@@ -14,9 +15,11 @@ RESPONSE_TYPES =  {
                     "ACK_WITH_SOURCE": 5
                   }
 COINGECKO_BASEURL = 'https://api.coingecko.com/api/v3'
-ALPHAVANTAGE_BASEURL = ''
+ALPHAVANTAGE_BASEURL = 'https://www.alphavantage.co'
+
 def fetch_coingecko_ids_list():
     req = requests.get(url=COINGECKO_BASEURL+'/coins/list')
+    # pythonic as hell
     return dict([(x['symbol'], x['id']) for x in req.json()])
 
 def fetch_crypto_price(symbol):
@@ -30,8 +33,9 @@ def fetch_crypto_price(symbol):
     except IndexError:
         return('No coin mentioned...') 
 
-def fetch_stock_price():
-    return ''
+def fetch_stock_price(symbol):
+    req = requests.get(url=ALPHAVANTAGE_BASEURL+'/query?function=GLOBAL_QUOTE&symbol='+symbol+'&interval=5min&apikey='+AV_KEY)
+    return req.json()['Global Quote']
 
 
 def verify_signature(event):
@@ -53,8 +57,6 @@ def stock_price_check(body):
     return body.get("type") == 1 and body.get("type") == 'stock'
 
 def lambda_handler(event, context):
-    print(fetch_crypto_price("BTC"))
-
     # verify the signature
     try:
         verify_signature(event)
@@ -68,10 +70,10 @@ def lambda_handler(event, context):
         return PING_PONG
     
     if crypto_price_check(body):
-        return PING_PONG
+        return fetch_crypto_price("BTC")
     
     if stock_price_check(body):
-        return PING_PONG
+        return fetch_crypto_price("TSLA")
     
     
     # dummy return
@@ -84,3 +86,6 @@ def lambda_handler(event, context):
                 "allowed_mentions": []
             }
     }
+
+# print(fetch_crypto_price("BTC"))
+# print(fetch_stock_price("TSLA")['05. price'])
