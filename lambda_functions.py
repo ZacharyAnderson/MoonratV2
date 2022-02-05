@@ -54,7 +54,7 @@ def verify_signature(event):
     verify_key.verify(message, bytes.fromhex(auth_sig)) # raises an error if unequal
 
 def ping_pong(body):
-    return body.get("type") == 1 and body.get("name") == blep
+    return body.get("type") == 1 and body.get("name") == 'blep'
 
 def crypto_price_check(body):
     return body.get("type") == 1 and body.get("name") == 'crypto'
