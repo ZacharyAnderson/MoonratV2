@@ -9,21 +9,19 @@ import configparser
 import requests
 import json
 
-# from nacl.signing import VerifyKey
-# from nacl.exceptions import BadSignatureError
+from nacl.signing import VerifyKey
+from nacl.exceptions import BadSignatureError
 
 # # Grab the Bot OAuth token from the environment.
-# # BOT_TOKEN = os.environ["BOT_TOKEN"]
-
-# PUBLIC_KEY = '<your public key here>' # found on Discord Application -> General Information page
-# PING_PONG = {"type": 1}
-# RESPONSE_TYPES =  { 
-#                     "PONG": 1, 
-#                     "ACK_NO_SOURCE": 2, 
-#                     "MESSAGE_NO_SOURCE": 3, 
-#                     "MESSAGE_WITH_SOURCE": 4, 
-#                     "ACK_WITH_SOURCE": 5
-#                   }
+PUBLIC_KEY = '36e021aad8da1ce202243153ca8ce6e71e544101281af49ee95ae22afc971ae3' # found on Discord Application -> General Information page
+PING_PONG = {"type": 1}
+RESPONSE_TYPES =  { 
+                    "PONG": 1, 
+                    "ACK_NO_SOURCE": 2, 
+                    "MESSAGE_NO_SOURCE": 3, 
+                    "MESSAGE_WITH_SOURCE": 4, 
+                    "ACK_WITH_SOURCE": 5
+                  }
 
 
 def verify_signature(event):
@@ -43,17 +41,16 @@ def ping_pong(body):
 def lambda_handler(event, context):
     print(f"event {event}") # debug print
     # verify the signature
-    return "200"
-    # try:
-    #     verify_signature(event)
-    # except Exception as e:
-    #     raise Exception(f"[UNAUTHORIZED] Invalid request signature: {e}")
+    try:
+        verify_signature(event)
+    except Exception as e:
+        raise Exception(f"[UNAUTHORIZED] Invalid request signature: {e}")
 
 
-    # # check if message is a ping
-    # body = event.get('body-json')
-    # if ping_pong(body):
-    #     return PING_PONG
+    # check if message is a ping
+    body = event.get('body-json')
+    if ping_pong(body):
+        return PING_PONG
     
     # formatted_output = parse_crypto_commands(text, COINMARKETCAP_TOKEN)
     # # dummy return
