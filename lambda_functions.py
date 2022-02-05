@@ -1,5 +1,5 @@
 import json
-import requests
+from botocore.vendored import requests
 
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
@@ -66,7 +66,6 @@ def lambda_handler(event, context):
     # check if message is a ping
     body = event.get('body-json')
     if ping_pong(body):
-        print(PING_PONG)
         return PING_PONG
     
     if crypto_price_check(body):
