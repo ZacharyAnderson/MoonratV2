@@ -1,29 +1,32 @@
 import json
 import pprint
+import os
 
-# from botocore.vendored import requests
-import requests
+from botocore.vendored import requests
+# import requests
 
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 
-AV_KEY = 'LF81812IX59K1B17'
-PUBLIC_KEY = '36e021aad8da1ce202243153ca8ce6e71e544101281af49ee95ae22afc971ae3' # found on Discord Application -> General Information page
+AV_KEY = os.environ['AV_KEY']
+PUBLIC_KEY = os.environ['PUBLIC_KEY']
+
 PING_PONG = {"type": 1}
-RESPONSE_TYPES =  { 
-                    "PONG": 1, 
-                    "ACK_NO_SOURCE": 2, 
-                    "MESSAGE_NO_SOURCE": 3, 
-                    "MESSAGE_WITH_SOURCE": 4, 
-                    "ACK_WITH_SOURCE": 5
-                  }
+RESPONSE_TYPES = {
+    "PONG": 1,
+    "ACK_NO_SOURCE": 2,
+    "MESSAGE_NO_SOURCE": 3,
+    "MESSAGE_WITH_SOURCE": 4,
+    "ACK_WITH_SOURCE": 5
+}
 COINGECKO_BASEURL = 'https://api.coingecko.com/api/v3'
 ALPHAVANTAGE_BASEURL = 'https://www.alphavantage.co'
+
 
 def disc_format(content):
     print(content)
     return {
-        "type": RESPONSE_TYPES['MESSAGE_NO_SOURCE'],
+        "type": RESPONSE_TYPES['MESSAGE_WITH_SOURCE'],
         "data": {
             "tts": False,
             "content": content,
@@ -38,12 +41,14 @@ def fetch_coingecko_ids_list():
     # pythonic as hell
     return dict([(x['symbol'], x['id']) for x in req.json()])
 
+
 def format_price_response(symbol, price, change):
     modifier = "+"
     changeVal = float(change.strip('%'))
     if(changeVal < 0):
         modifier = ""
     return symbol.upper() + " " + "${:,.2f}".format(float(price)) + " " + modifier + "{:,.2f}".format(changeVal)+"% last 24h"
+
 
 def fetch_crypto_price(symbol):
     if symbol == None or symbol == '':
@@ -54,11 +59,12 @@ def fetch_crypto_price(symbol):
     if (val == None):
         return disc_format("No coin found for " + symbol)
 
-    req = requests.get(url=COINGECKO_BASEURL+'/coins/'+val+'?tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false')
+    req = requests.get(url=COINGECKO_BASEURL+'/coins/'+val +
+                       '?tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false')
     resp = req.json()
-    if resp == None: 
+    if resp == None:
         return disc_format("No data available for coin " + symbol)
-    
+
     price = resp.get('market_data').get('current_price').get('usd')
     change = resp.get('market_data').get('price_change_percentage_24h')
 
@@ -66,13 +72,14 @@ def fetch_crypto_price(symbol):
         return disc_format("No data available for coin " + symbol)
 
     return disc_format(format_price_response(symbol, str(price), str(change)+"%"))
-    
+
 
 def fetch_stock_price(symbol):
     if symbol == None or symbol == '':
         return disc_format("No ticker provided")
 
-    req = requests.get(url=ALPHAVANTAGE_BASEURL+'/query?function=GLOBAL_QUOTE&symbol='+symbol+'&interval=5min&apikey='+AV_KEY)
+    req = requests.get(url=ALPHAVANTAGE_BASEURL +
+                       '/query?function=GLOBAL_QUOTE&symbol='+symbol+'&interval=5min&apikey='+AV_KEY)
     price = req.json().get('Global Quote').get('05. price')
     change = req.json().get('Global Quote').get('10. change percent')
 
@@ -82,24 +89,28 @@ def fetch_stock_price(symbol):
     return disc_format(format_price_response(symbol, price, change))
 
 
-
 def verify_signature(event):
     raw_body = event.get("rawBody")
     auth_sig = event['params']['header'].get('x-signature-ed25519')
-    auth_ts  = event['params']['header'].get('x-signature-timestamp')
+    auth_ts = event['params']['header'].get('x-signature-timestamp')
 
     message = auth_ts.encode() + raw_body.encode()
     verify_key = VerifyKey(bytes.fromhex(PUBLIC_KEY))
-    verify_key.verify(message, bytes.fromhex(auth_sig)) # raises an error if unequal
+    verify_key.verify(message, bytes.fromhex(auth_sig)
+                      )  # raises an error if unequal
+
 
 def ping_pong(body):
-    return body.get("type") == 1 and body.get("data")['name'] == 'blep'
+    return body.get("type") == 1
+
 
 def crypto_price_check(body):
     return body.get("type") == 2 and body.get("data")['name'] == 'crypto'
 
+
 def stock_price_check(body):
     return body.get("type") == 2 and body.get("data")['name'] == 'stock'
+
 
 def lambda_handler(event, context):
     # verify the signature
@@ -108,28 +119,27 @@ def lambda_handler(event, context):
     except Exception as e:
         raise Exception(f"[UNAUTHORIZED] Invalid request signature: {e}")
 
-    # check if message is a ping
     body = event.get('body-json')
-    if ping_pong(body):
-        return PING_PONG
-
     if crypto_price_check(body):
         slug = body['data']['options'][0]['value']
         return fetch_crypto_price(slug)
-    
+
     if stock_price_check(body):
         slug = body['data']['options'][0]['value']
         return fetch_stock_price(slug)
-    
-    
+
+    # check if message is a ping
+    if ping_pong(body):
+        return PING_PONG
+
     return {
-            "type": RESPONSE_TYPES['MESSAGE_NO_SOURCE'],
-            "data": {
-                "tts": False,
-                "content": "BEEP BOOP",
-                "embeds": [],
-                "allowed_mentions": []
-            }
+        "type": RESPONSE_TYPES['MESSAGE_NO_SOURCE'],
+        "data": {
+            "tts": False,
+            "content": "BEEP BOOP",
+            "embeds": [],
+            "allowed_mentions": []
+        }
     }
 
 # test cases

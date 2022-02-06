@@ -10,7 +10,7 @@ import json
 
 # # Grab the Bot OAuth token from the environment.
 # found on Discord Application -> General Information page
-PUBLIC_KEY = '36e021aad8da1ce202243153ca8ce6e71e544101281af49ee95ae22afc971ae3'
+PUBLIC_KEY = '<REDACTED>'
 PING_PONG = {"type": 1}
 RESPONSE_TYPES = {
     "PONG": 1,
